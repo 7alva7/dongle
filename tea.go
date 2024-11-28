@@ -2,12 +2,30 @@ package dongle
 
 import (
 	"bytes"
+	"fmt"
+
 	"golang.org/x/crypto/tea"
 )
 
+type TeaError struct {
+}
+
+func NewTeaError() TeaError {
+	return TeaError{}
+}
+
+func (e TeaError) KeyError(key []byte) error {
+	return fmt.Errorf("tea: invalid key size %d, the key must be 16 bytes", len(key))
+}
+
+func (e TeaError) RoundsError() error {
+	return fmt.Errorf("tea: invalid rounds, the rounds must be even")
+}
+
+var teaError = NewTeaError()
+
 // ByTea encrypts by tea.
-// 通过 tea 加密
-func (e Encrypter) ByTea(key interface{}, rounds ...int) Encrypter {
+func (e Encrypter) ByTea(key []byte, rounds ...int) Encrypter {
 	if len(e.src) == 0 || e.Error != nil {
 		return e
 	}
@@ -16,7 +34,7 @@ func (e Encrypter) ByTea(key interface{}, rounds ...int) Encrypter {
 		rounds = []int{64}
 	}
 	if rounds[0]&1 != 0 {
-		e.Error = invalidTeaRoundsError()
+		e.Error = teaError.RoundsError()
 		return e
 	}
 	src, size := e.src, tea.BlockSize
@@ -25,9 +43,9 @@ func (e Encrypter) ByTea(key interface{}, rounds ...int) Encrypter {
 	}
 	dst, buffer := make([]byte, size), bytes.NewBufferString("")
 	for _, chunk := range bytesSplit(src, size) {
-		block, err := tea.NewCipherWithRounds(interface2bytes(key), rounds[0])
+		block, err := tea.NewCipherWithRounds(key, rounds[0])
 		if err != nil {
-			e.Error = invalidTeaKeyError()
+			e.Error = teaError.KeyError(key)
 			return e
 		}
 		block.Encrypt(dst, chunk)
@@ -38,8 +56,7 @@ func (e Encrypter) ByTea(key interface{}, rounds ...int) Encrypter {
 }
 
 // ByTea decrypts by tea.
-// 通过 tea 解密
-func (d Decrypter) ByTea(key interface{}, rounds ...int) Decrypter {
+func (d Decrypter) ByTea(key []byte, rounds ...int) Decrypter {
 	if len(d.src) == 0 || d.Error != nil {
 		return d
 	}
@@ -48,15 +65,15 @@ func (d Decrypter) ByTea(key interface{}, rounds ...int) Decrypter {
 		rounds = []int{64}
 	}
 	if rounds[0]&1 != 0 {
-		d.Error = invalidTeaRoundsError()
+		d.Error = teaError.RoundsError()
 		return d
 	}
 	src, size := d.src, tea.BlockSize
 	dst, buffer := make([]byte, size), bytes.NewBufferString("")
 	for _, chunk := range bytesSplit(src, size) {
-		block, err := tea.NewCipherWithRounds(interface2bytes(key), rounds[0])
+		block, err := tea.NewCipherWithRounds(key, rounds[0])
 		if err != nil {
-			d.Error = invalidTeaKeyError()
+			d.Error = teaError.KeyError(key)
 			return d
 		}
 		block.Decrypt(dst, chunk)

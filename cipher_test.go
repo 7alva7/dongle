@@ -2,8 +2,9 @@ package dongle
 
 import (
 	"crypto/aes"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCipher_Encrypt(t *testing.T) {
@@ -11,7 +12,7 @@ func TestCipher_Encrypt(t *testing.T) {
 	cipher.SetMode(CBC)
 	cipher.SetPadding(PKCS7)
 
-	block, err1 := aes.NewCipher([]byte(aesKey))
+	block, err1 := aes.NewCipher(aesKey)
 	assert.Nil(t, err1)
 	dst, err2 := cipher.Encrypt([]byte(""), block)
 	assert.Nil(t, err2)
@@ -23,7 +24,7 @@ func TestCipher_Decrypt(t *testing.T) {
 	cipher.SetMode(CBC)
 	cipher.SetPadding(PKCS7)
 
-	block, err1 := aes.NewCipher([]byte(aesKey))
+	block, err1 := aes.NewCipher(aesKey)
 	assert.Nil(t, err1)
 	dst, err2 := cipher.Decrypt([]byte(""), block)
 	assert.Nil(t, err2)

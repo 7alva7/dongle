@@ -2,13 +2,14 @@ package dongle
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var (
-	blowfishKey = "0123456789abcdef"
-	blowfishIV  = "12345678"
+	blowfishKey = []byte("0123456789abcdef")
+	blowfishIV  = []byte("12345678")
 )
 
 var blowfishTests = []struct {
@@ -120,7 +121,7 @@ func TestBlowfish_Decrypt_String(t *testing.T) {
 func TestBlowfish_Encrypt_Bytes(t *testing.T) {
 	for index, test := range blowfishTests {
 		raw := Decode.FromBytes([]byte(test.toHex)).ByHex().ToBytes()
-		e := Encrypt.FromBytes([]byte(test.input)).ByBlowfish(getCipher(test.mode, test.padding, []byte(blowfishKey), []byte(blowfishIV)))
+		e := Encrypt.FromBytes([]byte(test.input)).ByBlowfish(getCipher(test.mode, test.padding, blowfishKey, blowfishIV))
 
 		t.Run(fmt.Sprintf(string(test.mode)+"_"+string(test.padding)+"_raw_test_%d", index), func(t *testing.T) {
 			assert.Nil(t, e.Error)
@@ -140,7 +141,7 @@ func TestBlowfish_Encrypt_Bytes(t *testing.T) {
 func TestBlowfish_Decrypt_Bytes(t *testing.T) {
 	for index, test := range blowfishTests {
 		raw := Decode.FromBytes([]byte(test.toHex)).ByHex().ToBytes()
-		e := Decrypt.FromRawBytes(raw).ByBlowfish(getCipher(test.mode, test.padding, []byte(blowfishKey), []byte(blowfishIV)))
+		e := Decrypt.FromRawBytes(raw).ByBlowfish(getCipher(test.mode, test.padding, blowfishKey, blowfishIV))
 
 		t.Run(fmt.Sprintf(string(test.mode)+"_"+string(test.padding)+"_raw_test_%d", index), func(t *testing.T) {
 			assert.Nil(t, e.Error)
@@ -149,7 +150,7 @@ func TestBlowfish_Decrypt_Bytes(t *testing.T) {
 	}
 
 	for index, test := range blowfishTests {
-		e := Decrypt.FromHexBytes([]byte(test.toHex)).ByBlowfish(getCipher(test.mode, test.padding, []byte(blowfishKey), []byte(blowfishIV)))
+		e := Decrypt.FromHexBytes([]byte(test.toHex)).ByBlowfish(getCipher(test.mode, test.padding, blowfishKey, blowfishIV))
 
 		t.Run(fmt.Sprintf(string(test.mode)+"_"+string(test.padding)+"_hex_test_%d", index), func(t *testing.T) {
 			assert.Nil(t, e.Error)
@@ -158,7 +159,7 @@ func TestBlowfish_Decrypt_Bytes(t *testing.T) {
 	}
 
 	for index, test := range blowfishTests {
-		e := Decrypt.FromBase64Bytes([]byte(test.toBase64)).ByBlowfish(getCipher(test.mode, test.padding, []byte(blowfishKey), []byte(blowfishIV)))
+		e := Decrypt.FromBase64Bytes([]byte(test.toBase64)).ByBlowfish(getCipher(test.mode, test.padding, blowfishKey, blowfishIV))
 
 		t.Run(fmt.Sprintf(string(test.mode)+"_"+string(test.padding)+"_base64_test_%d", index), func(t *testing.T) {
 			assert.Nil(t, e.Error)
@@ -168,37 +169,41 @@ func TestBlowfish_Decrypt_Bytes(t *testing.T) {
 }
 
 func TestBlowfish_Key_Error(t *testing.T) {
-	e := Encrypt.FromString("hello world").ByBlowfish(getCipher(CBC, PKCS7, "", blowfishIV))
-	assert.Equal(t, invalidBlowfishKeyError(), e.Error)
+	key, iv := []byte(""), blowfishIV
 
-	d := Decrypt.FromHexString("c1e9b4529aac9793010f4677f6358efe").ByBlowfish(getCipher(CBC, PKCS7, "", blowfishIV))
-	assert.Equal(t, invalidBlowfishKeyError(), d.Error)
+	e := Encrypt.FromString("hello world").ByBlowfish(getCipher(CBC, PKCS7, key, iv))
+	assert.Equal(t, blowfishError.KeyError([]byte("")), e.Error)
+
+	d := Decrypt.FromHexString("c1e9b4529aac9793010f4677f6358efe").ByBlowfish(getCipher(CBC, PKCS7, key, iv))
+	assert.Equal(t, blowfishError.KeyError([]byte("")), d.Error)
 }
 
 func TestBlowfish_IV_Error(t *testing.T) {
-	e := Encrypt.FromString("hello world").ByBlowfish(getCipher(OFB, PKCS7, blowfishKey, "xxxx"))
-	assert.Equal(t, invalidBlowfishIVError(), e.Error)
+	key, iv := blowfishKey, []byte("xxxx")
+	err := NewBlowfishError()
+	e := Encrypt.FromString("hello world").ByBlowfish(getCipher(OFB, PKCS7, key, iv))
+	assert.Equal(t, err.IvError(iv), e.Error)
 
-	d := Decrypt.FromHexString("c1e9b4529aac9793010f4677f6358efec1e9b4529aac9793010f4677f6358efe").ByBlowfish(getCipher(CBC, PKCS7, blowfishKey, "xxxx"))
-	assert.Equal(t, invalidBlowfishIVError(), d.Error)
+	d := Decrypt.FromHexString("c1e9b4529aac9793010f4677f6358efec1e9b4529aac9793010f4677f6358efe").ByBlowfish(getCipher(CBC, PKCS7, key, iv))
+	assert.Equal(t, err.IvError(iv), d.Error)
 }
 
 func TestBlowfish_Src_Error(t *testing.T) {
 	e := Encrypt.FromString("hello world").ByBlowfish(getCipher(CFB, No, blowfishKey, blowfishIV))
-	assert.Equal(t, invalidBlowfishSrcError(), e.Error)
+	assert.Equal(t, blowfishError.SrcError(), e.Error)
 
 	d := Decrypt.FromHexString("68656c6c6f20776f726c64").ByBlowfish(getCipher(CBC, No, blowfishKey, blowfishIV))
-	assert.Equal(t, invalidBlowfishSrcError(), d.Error)
+	assert.Equal(t, blowfishError.SrcError(), d.Error)
 }
 
 func TestBlowfish_Decoding_Error(t *testing.T) {
 	d1 := Decrypt.FromHexString("xxxx").ByBlowfish(getCipher(CTR, Zero, blowfishKey, blowfishIV))
-	assert.Equal(t, invalidDecodingError("hex"), d1.Error)
-	d2 := Decrypt.FromHexBytes([]byte("xxxx")).ByBlowfish(getCipher(CTR, Zero, []byte(blowfishKey), []byte(blowfishIV)))
-	assert.Equal(t, invalidDecodingError("hex"), d2.Error)
+	assert.Equal(t, decodeError.ModeError("hex"), d1.Error)
+	d2 := Decrypt.FromHexBytes([]byte("xxxx")).ByBlowfish(getCipher(CTR, Zero, blowfishKey, blowfishIV))
+	assert.Equal(t, decodeError.ModeError("hex"), d2.Error)
 
 	d3 := Decrypt.FromBase64String("xxxxxx").ByBlowfish(getCipher(CFB, PKCS7, blowfishKey, blowfishIV))
-	assert.Equal(t, invalidDecodingError("base64"), d3.Error)
-	d4 := Decrypt.FromBase64Bytes([]byte("xxxxxx")).ByBlowfish(getCipher(CFB, PKCS7, []byte(blowfishKey), []byte(blowfishIV)))
-	assert.Equal(t, invalidDecodingError("base64"), d4.Error)
+	assert.Equal(t, decodeError.ModeError("base64"), d3.Error)
+	d4 := Decrypt.FromBase64Bytes([]byte("xxxxxx")).ByBlowfish(getCipher(CFB, PKCS7, blowfishKey, blowfishIV))
+	assert.Equal(t, decodeError.ModeError("base64"), d4.Error)
 }

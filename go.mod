@@ -1,6 +1,6 @@
-module github.com/golang-module/dongle
+module github.com/dromara/dongle
 
-go 1.14
+go 1.16
 
 require (
 	github.com/emmansun/gmsm v0.15.5
